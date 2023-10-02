@@ -2,6 +2,7 @@ import socket
 import argparse
 import random
 import struct
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-t', '--timeout', type=int, default=5)
@@ -19,7 +20,7 @@ print(args)
 #id field
 randomNum = random.randint(0, 65535)
 print(randomNum)
-packet = struct.pack('>H', 34000)
+packet = struct.pack('>H', randomNum)
 #flags
 packet += struct.pack('>H', 256)
 #QDCOUNT
@@ -43,12 +44,16 @@ for label in labels:
 packet += struct.pack(">B", 0)
 
 # type of query
+rType = ""
 if args.mx == True:
     packet += struct.pack(">H", 2)
+    rType="MX"
 elif args.ns == True:
     packet += struct.pack(">H", 15)
+    rType="NS"
 else:
     packet += struct.pack(">H", 1)
+    rType="A"
 
 #QCLASS
 packet += struct.pack(">H", 1)
@@ -62,11 +67,15 @@ for character in args.server:
 
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 clientSocket.connect((server, args.port))
-#clientSocket.settimeout(args.timeout)
+clientSocket.settimeout(args.timeout)
 
+startTime = time.time()
 clientSocket.send(packet)
 received_data = clientSocket.recv(1024)
+endTime = time.time()
+
 clientSocket.close()
+elapsedTime = endTime - startTime
 #unpack DNS response header
 print(received_data)
 id, flags, qdcount, ancount, nscount, arcount = struct.unpack_from("!H H H H H H", received_data)
@@ -147,15 +156,24 @@ print(aClass)
 print(aTtl)
 print(aRdlength)
 
-# if aType == 1:
-#     print("ip")
+#output section
+print("DNS client sending request for {}".format(args.name))
+print("Server: {}".format(args.server))
+print("Request Type: {}".format(rType))
 
-# elif aType == 2:
-#     print("ns")
-# elif aType == 15:
-#     print("mx")
-# elif aType == 80:
-#     print("cname")
+print("Answer received after {} seconds".format(elapsedTime))
+if(ancount>0):
+    print("***Answer Section: {} records***".format(ancount))
+if aType == 1:
+    ipBone, ipBtwo, ipBthree, ipBfour = struct.unpack_from("!B B B B", received_data, offset)
+    ipAddress = str(ipBone) + "." + str(ipBtwo) + "." + str(ipBthree) + "." + str(ipBfour)
+    print("IP\t{}\t\tTTL\t{}".format(ipAddress, aTtl))
+elif aType == 2:
+    print("ns")
+elif aType == 15:
+    print("mx")
+elif aType == 80:
+    print("cname")
 
 
 
