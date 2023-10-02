@@ -106,13 +106,14 @@ print((qName,qTypeTwo, qClassTwo))
 #name processing
 labelsReturned = []
 iterLabel = ""
-print(offset)
+lastLabelPtr = False
 while True:
     checkLen=struct.unpack_from("!b", received_data, offset)
     if checkLen[0] == 0:
         if iterLabel != '':
             labelsReturned.append(iterLabel)
-        offset += 1
+        if lastLabelPtr == False:
+            offset += 1
         break
     elif checkLen[0] & 15 == 12:
         offset -= 1
@@ -123,6 +124,7 @@ while True:
         for key in cacheDict:
             if key >= ptrOffset:
                 labelsReturned.append(cacheDict[key])
+        lastLabelPtr = True
     elif checkLen[0]>=65 and checkLen[0]<=90:
         iterLabel += chr(checkLen[0])
         offset += 1
@@ -132,10 +134,9 @@ while True:
     else:
         if iterLabel != '':
             labelsReturned.append(iterLabel)
+            lastLabelPtr = False
         offset += 1
         iterLabel = ""
-
-print(offset)
 
 print(labelsReturned)
 aType, aClass, aTtl, aRdlength,  = struct.unpack_from("!H H I H", received_data, offset)
