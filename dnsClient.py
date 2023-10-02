@@ -107,6 +107,9 @@ while True:
     elif checkLen[0] >= 48 and checkLen[0] <= 57:
         iterLabel += chr(checkLen[0])
         offset += 1
+    elif checkLen[0] == 45:
+        iterLabel += chr(checkLen[0])
+        offset += 1
     else:
         labelsReturned.append(iterLabel)
         cacheDict[offset-(len(iterLabel)+1)] = iterLabel
@@ -132,8 +135,9 @@ while True:
         if lastLabelPtr == False:
             offset += 1
         break
-    elif checkLen[0] & 15 == 12:
-        offset -= 1
+    elif checkLen[0] & 192 == 192:
+        if iterLabel != "":
+            labelsReturned.append(iterLabel)
         checkLen=struct.unpack_from("!H", received_data, offset)
         ptrOffset = checkLen[0] & 16383
         offset += 2
@@ -149,6 +153,9 @@ while True:
         iterLabel += chr(checkLen[0])
         offset += 1
     elif checkLen[0] >= 48 and checkLen[0] <= 57:
+        iterLabel += chr(checkLen[0])
+        offset += 1
+    elif checkLen[0] == 45:
         iterLabel += chr(checkLen[0])
         offset += 1
     else:
@@ -187,8 +194,9 @@ if(ancount>0):
                     if lastLabelPtr == False:
                         offset += 1
                     break
-                elif checkLen[0] & 15 == 12:
-                    offset -= 1
+                elif checkLen[0] & 192 == 192:
+                    if iterLabel != "":
+                        labelsReturned.append(iterLabel)
                     checkLen=struct.unpack_from("!H", received_data, offset)
                     ptrOffset = checkLen[0] & 16383
                     offset += 2
@@ -204,6 +212,9 @@ if(ancount>0):
                     iterLabel += chr(checkLen[0])
                     offset += 1
                 elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                    iterLabel += chr(checkLen[0])
+                    offset += 1
+                elif checkLen[0] == 45:
                     iterLabel += chr(checkLen[0])
                     offset += 1
                 else:
@@ -233,8 +244,9 @@ if(ancount>0):
                     if lastLabelPtr == False:
                         offset += 1
                     break
-                elif checkLen[0] & 15 == 12:
-                    offset -= 1
+                elif checkLen[0] & 192 == 192:
+                    if iterLabel != "":
+                        labelsReturned.append(iterLabel)
                     checkLen=struct.unpack_from("!H", received_data, offset)
                     ptrOffset = checkLen[0] & 16383
                     offset += 2
@@ -251,6 +263,9 @@ if(ancount>0):
                     iterLabel += chr(checkLen[0])
                     offset += 1
                 elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                    iterLabel += chr(checkLen[0])
+                    offset += 1
+                elif checkLen[0] == 45:
                     iterLabel += chr(checkLen[0])
                     offset += 1
                 else:
@@ -276,16 +291,15 @@ if(ancount>0):
             lastLabelPtr = False
             while True:
                 checkLen=struct.unpack_from("!b", received_data, offset)
-                print(chr(checkLen[0]))
-                print(iterLabel)
                 if checkLen[0] == 0:
                     if iterLabel != '':
                         labelsReturned.append(iterLabel)
                     if lastLabelPtr == False:
                         offset += 1
                     break
-                elif checkLen[0] & 15 == 12:
-                    offset -= 1
+                elif checkLen[0] & 192 == 192:
+                    if iterLabel != "":
+                        labelsReturned.append(iterLabel)
                     checkLen=struct.unpack_from("!H", received_data, offset)
                     ptrOffset = checkLen[0] & 16383
                     offset += 2
@@ -321,7 +335,7 @@ if(ancount>0):
                     nameServer += "."
             
             print("MX Alias\t{}\t\tPreference\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, mxPreference[0], aTtl, auth))
-
+    
         elif aType == 80:
             labelsReturned = []
             iterLabel = ""
@@ -334,8 +348,9 @@ if(ancount>0):
                     if lastLabelPtr == False:
                         offset += 1
                     break
-                elif checkLen[0] & 15 == 12:
-                    offset -= 1
+                elif checkLen[0] & 192 == 192:
+                    if iterLabel != "":
+                        labelsReturned.append(iterLabel)
                     checkLen=struct.unpack_from("!H", received_data, offset)
                     ptrOffset = checkLen[0] & 16383
                     offset += 2
@@ -352,6 +367,9 @@ if(ancount>0):
                     iterLabel += chr(checkLen[0])
                     offset += 1
                 elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                    iterLabel += chr(checkLen[0])
+                    offset += 1
+                elif checkLen[0] == 45:
                     iterLabel += chr(checkLen[0])
                     offset += 1
                 else:
