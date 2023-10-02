@@ -1,4 +1,3 @@
-import sys
 import socket
 import argparse
 import random
@@ -135,7 +134,7 @@ while True:
             labelsReturned.append(iterLabel)
         offset += 1
         iterLabel = ""
-        
+
 print(offset)
 
 print(labelsReturned)
