@@ -71,7 +71,7 @@ clientSocket.settimeout(args.timeout)
 
 startTime = time.time()
 clientSocket.send(packet)
-received_data = clientSocket.recv(1024)
+received_data = clientSocket.recv(2048)
 endTime = time.time()
 
 clientSocket.close()
@@ -102,6 +102,9 @@ while True:
         iterLabel += chr(checkLen[0])
         offset += 1
     elif checkLen[0] >= 97 and checkLen[0] <= 122:
+        iterLabel += chr(checkLen[0])
+        offset += 1
+    elif checkLen[0] >= 48 and checkLen[0] <= 57:
         iterLabel += chr(checkLen[0])
         offset += 1
     else:
@@ -217,6 +220,7 @@ if(ancount>0):
             ipBone, ipBtwo, ipBthree, ipBfour = struct.unpack_from("!B B B B", received_data, offset)
             ipAddress = str(ipBone) + "." + str(ipBtwo) + "." + str(ipBthree) + "." + str(ipBfour)
             print("IP\t{}\t\tTTL\t{}\t\tAA\t{}".format(ipAddress, aTtl, auth))
+
         elif aType == 2:
             labelsReturned = []
             iterLabel = ""
@@ -265,7 +269,59 @@ if(ancount>0):
             print("NS Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
 
         elif aType == 15:
-            print("mx")
+            mxPreference = struct.unpack_from("!H", received_data, offset)
+            offset += 2
+            labelsReturned = []
+            iterLabel = ""
+            lastLabelPtr = False
+            while True:
+                checkLen=struct.unpack_from("!b", received_data, offset)
+                print(chr(checkLen[0]))
+                print(iterLabel)
+                if checkLen[0] == 0:
+                    if iterLabel != '':
+                        labelsReturned.append(iterLabel)
+                    if lastLabelPtr == False:
+                        offset += 1
+                    break
+                elif checkLen[0] & 15 == 12:
+                    offset -= 1
+                    checkLen=struct.unpack_from("!H", received_data, offset)
+                    ptrOffset = checkLen[0] & 16383
+                    offset += 2
+                    iterLabel=""
+                    for key in cacheDict:
+                        if key >= ptrOffset:
+                            labelsReturned.append(cacheDict[key])
+                    lastLabelPtr = True
+                    break
+                elif checkLen[0]>=65 and checkLen[0]<=90:
+                    iterLabel += chr(checkLen[0])
+                    offset += 1
+                elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                    iterLabel += chr(checkLen[0])
+                    offset += 1
+                elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                    iterLabel += chr(checkLen[0])
+                    offset += 1
+                elif checkLen[0] == 45:
+                    iterLabel += chr(checkLen[0])
+                    offset += 1
+                else:
+                    if iterLabel != '':
+                        labelsReturned.append(iterLabel)
+                        lastLabelPtr = False
+                    offset += 1
+                    iterLabel = ""
+            
+            nameServer = ""
+            for i in range(len(labelsReturned)):
+                nameServer += labelsReturned[i]
+                if i!=(len(labelsReturned)-1):
+                    nameServer += "."
+            
+            print("MX Alias\t{}\t\tPreference\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, mxPreference[0], aTtl, auth))
+
         elif aType == 80:
             labelsReturned = []
             iterLabel = ""
