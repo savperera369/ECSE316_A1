@@ -404,6 +404,7 @@ while retries < args.maxretries:
                     print("CNAME Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
 
         if(nscount>0):
+            print("{} authoritative records received".format(nscount))
             for i in range(arcount):
                 labelsReturned = []
                 iterLabel = ""
