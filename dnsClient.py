@@ -84,7 +84,6 @@ if flags & 1024 == 1024:
     auth = "auth"
 else:
     auth = "nonauth"
-print((id,flags,qdcount,ancount,nscount,arcount))
 
 #unpack question
 offset = 12
@@ -94,8 +93,9 @@ iterLabel = ""
 while True:
     checkLen=struct.unpack_from("!b", received_data, offset)
     if checkLen[0] == 0:
-        labelsReturned.append(iterLabel)
-        cacheDict[offset-(len(iterLabel)+1)] = iterLabel
+        if iterLabel != '':
+            labelsReturned.append(iterLabel)
+            cacheDict[offset-(len(iterLabel)+1)] = iterLabel
         offset += 1
         break
     elif checkLen[0]>=65 and checkLen[0]<=90:
@@ -111,17 +111,14 @@ while True:
         iterLabel += chr(checkLen[0])
         offset += 1
     else:
-        labelsReturned.append(iterLabel)
-        cacheDict[offset-(len(iterLabel)+1)] = iterLabel
+        if iterLabel != '':
+            labelsReturned.append(iterLabel)
+            cacheDict[offset-(len(iterLabel)+1)] = iterLabel
         offset += 1
         iterLabel = ""
 
-qName = list(filter(lambda input: input != '', labelsReturned))
-print(cacheDict)
 qTypeTwo, qClassTwo = struct.unpack_from("!H H", received_data, offset)
 offset += 4
-
-print((qName,qTypeTwo, qClassTwo))
 
 #name processing
 labelsReturned = []
@@ -167,11 +164,6 @@ while True:
 
 aType, aClass, aTtl, aRdlength = struct.unpack_from("!H H I H", received_data, offset)
 offset += 10
-
-print(aType)
-print(aClass)
-print(aTtl)
-print(aRdlength)
 
 #output section
 print("DNS client sending request for {}".format(args.name))
