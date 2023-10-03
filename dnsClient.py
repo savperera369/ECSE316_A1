@@ -80,6 +80,7 @@ while retries < args.maxretries:
         clientSocket.close()
         elapsedTime = endTime - startTime
 
+        print(received_data)
         #unpack DNS response header
         id, flags, qdcount, ancount, nscount, arcount = struct.unpack_from("!H H H H H H", received_data)
 
@@ -353,7 +354,7 @@ while retries < args.maxretries:
                     
                     print("MX Alias\t{}\t\tPreference\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, mxPreference[0], aTtl, auth))
             
-                elif aType == 80:
+                elif aType == 5:
                     labelsReturned = []
                     iterLabel = ""
                     lastLabelPtr = False
@@ -554,7 +555,7 @@ while retries < args.maxretries:
                         if i!=(len(labelsReturned)-1):
                             nameServer += "."
             
-                elif aType == 80:
+                elif aType == 5:
                     labelsReturned = []
                     iterLabel = ""
                     lastLabelPtr = False
@@ -759,7 +760,7 @@ while retries < args.maxretries:
                     
                     print("MX Alias\t{}\t\tPreference\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, mxPreference[0], aTtl, auth))
             
-                elif aType == 80:
+                elif aType == 5:
                     labelsReturned = []
                     iterLabel = ""
                     lastLabelPtr = False
