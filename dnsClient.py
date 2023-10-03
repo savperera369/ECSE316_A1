@@ -6,7 +6,7 @@ import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-t', '--timeout', type=int, default=5)
-parser.add_argument('-r', '--max-retries', type=int, default=3)
+parser.add_argument('-r', '--maxretries', type=int, default=3)
 parser.add_argument('-p', '--port', type=int, default=53)
 group = parser.add_mutually_exclusive_group()
 group.add_argument('-mx', action="store_true", default="False")
@@ -65,320 +65,539 @@ for character in args.server:
     if character != '@':
         server += character
 
-clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-clientSocket.connect((server, args.port))
-clientSocket.settimeout(args.timeout)
+retries = 0
+elapsedTime = 0
+received_data = 0
 
-startTime = time.time()
-clientSocket.send(packet)
-received_data = clientSocket.recv(2048)
-endTime = time.time()
+while retries < args.maxretries:
+    try:
+        clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        clientSocket.connect((server, args.port))
+        clientSocket.settimeout(args.timeout)
 
-clientSocket.close()
-elapsedTime = endTime - startTime
-#unpack DNS response header
-print(received_data)
-id, flags, qdcount, ancount, nscount, arcount = struct.unpack_from("!H H H H H H", received_data)
-auth = ""
-if flags & 1024 == 1024:
-    auth = "auth"
-else:
-    auth = "nonauth"
+        startTime = time.time()
+        clientSocket.send(packet)
+        received_data = clientSocket.recv(2048)
+        endTime = time.time()
 
-#unpack question
-offset = 12
-labelsReturned = []
-cacheDict = {}
-iterLabel = ""
-while True:
-    checkLen=struct.unpack_from("!b", received_data, offset)
-    if checkLen[0] == 0:
-        if iterLabel != '':
-            labelsReturned.append(iterLabel)
-            cacheDict[offset-(len(iterLabel)+1)] = iterLabel
-        offset += 1
-        break
-    elif checkLen[0]>=65 and checkLen[0]<=90:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    elif checkLen[0] >= 97 and checkLen[0] <= 122:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    elif checkLen[0] >= 48 and checkLen[0] <= 57:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    elif checkLen[0] == 45:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    else:
-        if iterLabel != '':
-            labelsReturned.append(iterLabel)
-            cacheDict[offset-(len(iterLabel)+1)] = iterLabel
-        offset += 1
+        clientSocket.close()
+        elapsedTime = endTime - startTime
+
+        #unpack DNS response header
+        print(received_data)
+        id, flags, qdcount, ancount, nscount, arcount = struct.unpack_from("!H H H H H H", received_data)
+        auth = ""
+        if flags & 1024 == 1024:
+            auth = "auth"
+        else:
+            auth = "nonauth"
+
+        #unpack question
+        offset = 12
+        labelsReturned = []
+        cacheDict = {}
         iterLabel = ""
+        while True:
+            checkLen=struct.unpack_from("!b", received_data, offset)
+            if checkLen[0] == 0:
+                if iterLabel != '':
+                    labelsReturned.append(iterLabel)
+                    cacheDict[offset-(len(iterLabel)+1)] = iterLabel
+                offset += 1
+                break
+            elif checkLen[0]>=65 and checkLen[0]<=90:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            elif checkLen[0] == 45:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            else:
+                if iterLabel != '':
+                    labelsReturned.append(iterLabel)
+                    cacheDict[offset-(len(iterLabel)+1)] = iterLabel
+                offset += 1
+                iterLabel = ""
 
-qTypeTwo, qClassTwo = struct.unpack_from("!H H", received_data, offset)
-offset += 4
+        qTypeTwo, qClassTwo = struct.unpack_from("!H H", received_data, offset)
+        offset += 4
 
-#name processing
-labelsReturned = []
-iterLabel = ""
-lastLabelPtr = False
-while True:
-    checkLen=struct.unpack_from("!b", received_data, offset)
-    if checkLen[0] == 0:
-        if iterLabel != '':
-            labelsReturned.append(iterLabel)
-        if lastLabelPtr == False:
-            offset += 1
-        break
-    elif checkLen[0] & 192 == 192:
-        if iterLabel != "":
-            labelsReturned.append(iterLabel)
-        checkLen=struct.unpack_from("!H", received_data, offset)
-        ptrOffset = checkLen[0] & 16383
-        offset += 2
-        iterLabel=""
-        for key in cacheDict:
-            if key >= ptrOffset:
-                labelsReturned.append(cacheDict[key])
-        lastLabelPtr = True
-    elif checkLen[0]>=65 and checkLen[0]<=90:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    elif checkLen[0] >= 97 and checkLen[0] <= 122:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    elif checkLen[0] >= 48 and checkLen[0] <= 57:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    elif checkLen[0] == 45:
-        iterLabel += chr(checkLen[0])
-        offset += 1
-    else:
-        if iterLabel != '':
-            labelsReturned.append(iterLabel)
-            lastLabelPtr = False
-        offset += 1
+        #name processing
+        labelsReturned = []
         iterLabel = ""
+        lastLabelPtr = False
+        while True:
+            checkLen=struct.unpack_from("!b", received_data, offset)
+            if checkLen[0] == 0:
+                if iterLabel != '':
+                    labelsReturned.append(iterLabel)
+                if lastLabelPtr == False:
+                    offset += 1
+                break
+            elif checkLen[0] & 192 == 192:
+                if iterLabel != "":
+                    labelsReturned.append(iterLabel)
+                checkLen=struct.unpack_from("!H", received_data, offset)
+                ptrOffset = checkLen[0] & 16383
+                offset += 2
+                iterLabel=""
+                for key in cacheDict:
+                    if key >= ptrOffset:
+                        labelsReturned.append(cacheDict[key])
+                lastLabelPtr = True
+            elif checkLen[0]>=65 and checkLen[0]<=90:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            elif checkLen[0] == 45:
+                iterLabel += chr(checkLen[0])
+                offset += 1
+            else:
+                if iterLabel != '':
+                    labelsReturned.append(iterLabel)
+                    lastLabelPtr = False
+                offset += 1
+                iterLabel = ""
 
-aType, aClass, aTtl, aRdlength = struct.unpack_from("!H H I H", received_data, offset)
-offset += 10
+        aType, aClass, aTtl, aRdlength = struct.unpack_from("!H H I H", received_data, offset)
+        offset += 10
 
-#output section
-print("DNS client sending request for {}".format(args.name))
-print("Server: {}".format(args.server))
-print("Request Type: {}".format(rType))
+        #output section
+        print("DNS client sending request for {}".format(args.name))
+        print("Server: {}".format(args.server))
+        print("Request Type: {}".format(rType))
 
-print("Answer received after {} seconds".format(elapsedTime))
-if(ancount>0):
-    print("***Answer Section: {} records***".format(ancount))
-    for i in range(ancount):
-        if (i > 0):
-            labelsReturned = []
-            iterLabel = ""
-            lastLabelPtr = False
-            while True:
-                checkLen=struct.unpack_from("!b", received_data, offset)
-                if checkLen[0] == 0:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                    if lastLabelPtr == False:
-                        offset += 1
-                    break
-                elif checkLen[0] & 192 == 192:
-                    if iterLabel != "":
-                        labelsReturned.append(iterLabel)
-                    checkLen=struct.unpack_from("!H", received_data, offset)
-                    ptrOffset = checkLen[0] & 16383
-                    offset += 2
-                    iterLabel=""
-                    for key in cacheDict:
-                        if key >= ptrOffset:
-                            labelsReturned.append(cacheDict[key])
-                    lastLabelPtr = True
-                elif checkLen[0]>=65 and checkLen[0]<=90:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 97 and checkLen[0] <= 122:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 48 and checkLen[0] <= 57:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] == 45:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                else:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                        lastLabelPtr = False
-                    offset += 1
+        print("Answer received after {} seconds after {} retries".format(elapsedTime, retries))
+        if(ancount>0):
+            print("***Answer Section: {} records***".format(ancount))
+            for i in range(ancount):
+                if (i > 0):
+                    labelsReturned = []
                     iterLabel = ""
+                    lastLabelPtr = False
+                    while True:
+                        checkLen=struct.unpack_from("!b", received_data, offset)
+                        if checkLen[0] == 0:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                            if lastLabelPtr == False:
+                                offset += 1
+                            break
+                        elif checkLen[0] & 192 == 192:
+                            if iterLabel != "":
+                                labelsReturned.append(iterLabel)
+                            checkLen=struct.unpack_from("!H", received_data, offset)
+                            ptrOffset = checkLen[0] & 16383
+                            offset += 2
+                            iterLabel=""
+                            for key in cacheDict:
+                                if key >= ptrOffset:
+                                    labelsReturned.append(cacheDict[key])
+                            lastLabelPtr = True
+                        elif checkLen[0]>=65 and checkLen[0]<=90:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] == 45:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        else:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                                lastLabelPtr = False
+                            offset += 1
+                            iterLabel = ""
 
-            aType, aClass, aTtl, aRdlength = struct.unpack_from("!H H I H", received_data, offset)
-            offset += 10
+                    aType, aClass, aTtl, aRdlength = struct.unpack_from("!H H I H", received_data, offset)
+                    offset += 10
 
-        if aType == 1:
-            ipBone, ipBtwo, ipBthree, ipBfour = struct.unpack_from("!B B B B", received_data, offset)
-            ipAddress = str(ipBone) + "." + str(ipBtwo) + "." + str(ipBthree) + "." + str(ipBfour)
-            print("IP\t{}\t\tTTL\t{}\t\tAA\t{}".format(ipAddress, aTtl, auth))
+                if aType == 1:
+                    ipBone, ipBtwo, ipBthree, ipBfour = struct.unpack_from("!B B B B", received_data, offset)
+                    ipAddress = str(ipBone) + "." + str(ipBtwo) + "." + str(ipBthree) + "." + str(ipBfour)
+                    print("IP\t{}\t\tTTL\t{}\t\tAA\t{}".format(ipAddress, aTtl, auth))
 
-        elif aType == 2:
-            labelsReturned = []
-            iterLabel = ""
-            lastLabelPtr = False
-            while True:
-                checkLen=struct.unpack_from("!b", received_data, offset)
-                if checkLen[0] == 0:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                    if lastLabelPtr == False:
-                        offset += 1
-                    break
-                elif checkLen[0] & 192 == 192:
-                    if iterLabel != "":
-                        labelsReturned.append(iterLabel)
-                    checkLen=struct.unpack_from("!H", received_data, offset)
-                    ptrOffset = checkLen[0] & 16383
-                    offset += 2
-                    iterLabel=""
-                    for key in cacheDict:
-                        if key >= ptrOffset:
-                            labelsReturned.append(cacheDict[key])
-                    lastLabelPtr = True
-                    break
-                elif checkLen[0]>=65 and checkLen[0]<=90:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 97 and checkLen[0] <= 122:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 48 and checkLen[0] <= 57:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] == 45:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                else:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                        lastLabelPtr = False
-                    offset += 1
+                elif aType == 2:
+                    labelsReturned = []
                     iterLabel = ""
-            
-            nameServer = ""
-            for i in range(len(labelsReturned)):
-                nameServer += labelsReturned[i]
-                if i!=(len(labelsReturned)-1):
-                    nameServer += "."
-            
-            print("NS Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
+                    lastLabelPtr = False
+                    while True:
+                        checkLen=struct.unpack_from("!b", received_data, offset)
+                        if checkLen[0] == 0:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                            if lastLabelPtr == False:
+                                offset += 1
+                            break
+                        elif checkLen[0] & 192 == 192:
+                            if iterLabel != "":
+                                labelsReturned.append(iterLabel)
+                            checkLen=struct.unpack_from("!H", received_data, offset)
+                            ptrOffset = checkLen[0] & 16383
+                            offset += 2
+                            iterLabel=""
+                            for key in cacheDict:
+                                if key >= ptrOffset:
+                                    labelsReturned.append(cacheDict[key])
+                            lastLabelPtr = True
+                            break
+                        elif checkLen[0]>=65 and checkLen[0]<=90:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] == 45:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        else:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                                lastLabelPtr = False
+                            offset += 1
+                            iterLabel = ""
+                    
+                    nameServer = ""
+                    for i in range(len(labelsReturned)):
+                        nameServer += labelsReturned[i]
+                        if i!=(len(labelsReturned)-1):
+                            nameServer += "."
+                    
+                    print("NS Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
 
-        elif aType == 15:
-            mxPreference = struct.unpack_from("!H", received_data, offset)
-            offset += 2
-            labelsReturned = []
-            iterLabel = ""
-            lastLabelPtr = False
-            while True:
-                checkLen=struct.unpack_from("!b", received_data, offset)
-                if checkLen[0] == 0:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                    if lastLabelPtr == False:
-                        offset += 1
-                    break
-                elif checkLen[0] & 192 == 192:
-                    if iterLabel != "":
-                        labelsReturned.append(iterLabel)
-                    checkLen=struct.unpack_from("!H", received_data, offset)
-                    ptrOffset = checkLen[0] & 16383
+                elif aType == 15:
+                    mxPreference = struct.unpack_from("!H", received_data, offset)
                     offset += 2
-                    iterLabel=""
-                    for key in cacheDict:
-                        if key >= ptrOffset:
-                            labelsReturned.append(cacheDict[key])
-                    lastLabelPtr = True
-                    break
-                elif checkLen[0]>=65 and checkLen[0]<=90:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 97 and checkLen[0] <= 122:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 48 and checkLen[0] <= 57:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] == 45:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                else:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                        lastLabelPtr = False
-                    offset += 1
+                    labelsReturned = []
                     iterLabel = ""
+                    lastLabelPtr = False
+                    while True:
+                        checkLen=struct.unpack_from("!b", received_data, offset)
+                        if checkLen[0] == 0:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                            if lastLabelPtr == False:
+                                offset += 1
+                            break
+                        elif checkLen[0] & 192 == 192:
+                            if iterLabel != "":
+                                labelsReturned.append(iterLabel)
+                            checkLen=struct.unpack_from("!H", received_data, offset)
+                            ptrOffset = checkLen[0] & 16383
+                            offset += 2
+                            iterLabel=""
+                            for key in cacheDict:
+                                if key >= ptrOffset:
+                                    labelsReturned.append(cacheDict[key])
+                            lastLabelPtr = True
+                            break
+                        elif checkLen[0]>=65 and checkLen[0]<=90:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] == 45:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        else:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                                lastLabelPtr = False
+                            offset += 1
+                            iterLabel = ""
+                    
+                    nameServer = ""
+                    for i in range(len(labelsReturned)):
+                        nameServer += labelsReturned[i]
+                        if i!=(len(labelsReturned)-1):
+                            nameServer += "."
+                    
+                    print("MX Alias\t{}\t\tPreference\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, mxPreference[0], aTtl, auth))
             
-            nameServer = ""
-            for i in range(len(labelsReturned)):
-                nameServer += labelsReturned[i]
-                if i!=(len(labelsReturned)-1):
-                    nameServer += "."
-            
-            print("MX Alias\t{}\t\tPreference\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, mxPreference[0], aTtl, auth))
-    
-        elif aType == 80:
-            labelsReturned = []
-            iterLabel = ""
-            lastLabelPtr = False
-            while True:
-                checkLen=struct.unpack_from("!b", received_data, offset)
-                if checkLen[0] == 0:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                    if lastLabelPtr == False:
+                elif aType == 80:
+                    labelsReturned = []
+                    iterLabel = ""
+                    lastLabelPtr = False
+                    while True:
+                        checkLen=struct.unpack_from("!b", received_data, offset)
+                        if checkLen[0] == 0:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                            if lastLabelPtr == False:
+                                offset += 1
+                            break
+                        elif checkLen[0] & 192 == 192:
+                            if iterLabel != "":
+                                labelsReturned.append(iterLabel)
+                            checkLen=struct.unpack_from("!H", received_data, offset)
+                            ptrOffset = checkLen[0] & 16383
+                            offset += 2
+                            iterLabel=""
+                            for key in cacheDict:
+                                if key >= ptrOffset:
+                                    labelsReturned.append(cacheDict[key])
+                            lastLabelPtr = True
+                            break
+                        elif checkLen[0]>=65 and checkLen[0]<=90:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] == 45:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        else:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                                lastLabelPtr = False
+                            offset += 1
+                            iterLabel = ""
+                    
+                    nameServer = ""
+                    for i in range(len(labelsReturned)):
+                        nameServer += labelsReturned[i]
+                        if i!=(len(labelsReturned)-1):
+                            nameServer += "."
+                    
+                    print("CNAME Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
+        
+        print(nscount)
+        if(arcount>0):
+            print("***Additional Section: {} records***".format(arcount))
+            for i in range(arcount):
+                labelsReturned = []
+                iterLabel = ""
+                lastLabelPtr = False
+                while True:
+                    checkLen=struct.unpack_from("!b", received_data, offset)
+                    if checkLen[0] == 0:
+                        if iterLabel != '':
+                            labelsReturned.append(iterLabel)
+                        if lastLabelPtr == False:
+                            offset += 1
+                        break
+                    elif checkLen[0] & 192 == 192:
+                        if iterLabel != "":
+                            labelsReturned.append(iterLabel)
+                        checkLen=struct.unpack_from("!H", received_data, offset)
+                        ptrOffset = checkLen[0] & 16383
+                        offset += 2
+                        iterLabel=""
+                        for key in cacheDict:
+                            if key >= ptrOffset:
+                                labelsReturned.append(cacheDict[key])
+                        lastLabelPtr = True
+                    elif checkLen[0]>=65 and checkLen[0]<=90:
+                        iterLabel += chr(checkLen[0])
                         offset += 1
-                    break
-                elif checkLen[0] & 192 == 192:
-                    if iterLabel != "":
-                        labelsReturned.append(iterLabel)
-                    checkLen=struct.unpack_from("!H", received_data, offset)
-                    ptrOffset = checkLen[0] & 16383
-                    offset += 2
-                    iterLabel=""
-                    for key in cacheDict:
-                        if key >= ptrOffset:
-                            labelsReturned.append(cacheDict[key])
-                    lastLabelPtr = True
-                    break
-                elif checkLen[0]>=65 and checkLen[0]<=90:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 97 and checkLen[0] <= 122:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] >= 48 and checkLen[0] <= 57:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                elif checkLen[0] == 45:
-                    iterLabel += chr(checkLen[0])
-                    offset += 1
-                else:
-                    if iterLabel != '':
-                        labelsReturned.append(iterLabel)
-                        lastLabelPtr = False
-                    offset += 1
-                    iterLabel = ""
-            
-            nameServer = ""
-            for i in range(len(labelsReturned)):
-                nameServer += labelsReturned[i]
-                if i!=(len(labelsReturned)-1):
-                    nameServer += "."
-            
-            print("CNAME Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
+                    elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                        iterLabel += chr(checkLen[0])
+                        offset += 1
+                    elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                        iterLabel += chr(checkLen[0])
+                        offset += 1
+                    elif checkLen[0] == 45:
+                        iterLabel += chr(checkLen[0])
+                        offset += 1
+                    else:
+                        if iterLabel != '':
+                            labelsReturned.append(iterLabel)
+                            lastLabelPtr = False
+                        offset += 1
+                        iterLabel = ""
 
+                aType, aClass, aTtl, aRdlength = struct.unpack_from("!H H I H", received_data, offset)
+                offset += 10
+
+                if aType == 1:
+                    ipBone, ipBtwo, ipBthree, ipBfour = struct.unpack_from("!B B B B", received_data, offset)
+                    ipAddress = str(ipBone) + "." + str(ipBtwo) + "." + str(ipBthree) + "." + str(ipBfour)
+                    print("IP\t{}\t\tTTL\t{}\t\tAA\t{}".format(ipAddress, aTtl, auth))
+
+                elif aType == 2:
+                    labelsReturned = []
+                    iterLabel = ""
+                    lastLabelPtr = False
+                    while True:
+                        checkLen=struct.unpack_from("!b", received_data, offset)
+                        if checkLen[0] == 0:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                            if lastLabelPtr == False:
+                                offset += 1
+                            break
+                        elif checkLen[0] & 192 == 192:
+                            if iterLabel != "":
+                                labelsReturned.append(iterLabel)
+                            checkLen=struct.unpack_from("!H", received_data, offset)
+                            ptrOffset = checkLen[0] & 16383
+                            offset += 2
+                            iterLabel=""
+                            for key in cacheDict:
+                                if key >= ptrOffset:
+                                    labelsReturned.append(cacheDict[key])
+                            lastLabelPtr = True
+                            break
+                        elif checkLen[0]>=65 and checkLen[0]<=90:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] == 45:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        else:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                                lastLabelPtr = False
+                            offset += 1
+                            iterLabel = ""
+                    
+                    nameServer = ""
+                    for i in range(len(labelsReturned)):
+                        nameServer += labelsReturned[i]
+                        if i!=(len(labelsReturned)-1):
+                            nameServer += "."
+                    
+                    print("NS Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
+
+                elif aType == 15:
+                    mxPreference = struct.unpack_from("!H", received_data, offset)
+                    offset += 2
+                    labelsReturned = []
+                    iterLabel = ""
+                    lastLabelPtr = False
+                    while True:
+                        checkLen=struct.unpack_from("!b", received_data, offset)
+                        if checkLen[0] == 0:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                            if lastLabelPtr == False:
+                                offset += 1
+                            break
+                        elif checkLen[0] & 192 == 192:
+                            if iterLabel != "":
+                                labelsReturned.append(iterLabel)
+                            checkLen=struct.unpack_from("!H", received_data, offset)
+                            ptrOffset = checkLen[0] & 16383
+                            offset += 2
+                            iterLabel=""
+                            for key in cacheDict:
+                                if key >= ptrOffset:
+                                    labelsReturned.append(cacheDict[key])
+                            lastLabelPtr = True
+                            break
+                        elif checkLen[0]>=65 and checkLen[0]<=90:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] == 45:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        else:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                                lastLabelPtr = False
+                            offset += 1
+                            iterLabel = ""
+                    
+                    nameServer = ""
+                    for i in range(len(labelsReturned)):
+                        nameServer += labelsReturned[i]
+                        if i!=(len(labelsReturned)-1):
+                            nameServer += "."
+                    
+                    print("MX Alias\t{}\t\tPreference\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, mxPreference[0], aTtl, auth))
+            
+                elif aType == 80:
+                    labelsReturned = []
+                    iterLabel = ""
+                    lastLabelPtr = False
+                    while True:
+                        checkLen=struct.unpack_from("!b", received_data, offset)
+                        if checkLen[0] == 0:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                            if lastLabelPtr == False:
+                                offset += 1
+                            break
+                        elif checkLen[0] & 192 == 192:
+                            if iterLabel != "":
+                                labelsReturned.append(iterLabel)
+                            checkLen=struct.unpack_from("!H", received_data, offset)
+                            ptrOffset = checkLen[0] & 16383
+                            offset += 2
+                            iterLabel=""
+                            for key in cacheDict:
+                                if key >= ptrOffset:
+                                    labelsReturned.append(cacheDict[key])
+                            lastLabelPtr = True
+                            break
+                        elif checkLen[0]>=65 and checkLen[0]<=90:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 97 and checkLen[0] <= 122:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] >= 48 and checkLen[0] <= 57:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        elif checkLen[0] == 45:
+                            iterLabel += chr(checkLen[0])
+                            offset += 1
+                        else:
+                            if iterLabel != '':
+                                labelsReturned.append(iterLabel)
+                                lastLabelPtr = False
+                            offset += 1
+                            iterLabel = ""
+                    
+                    nameServer = ""
+                    for i in range(len(labelsReturned)):
+                        nameServer += labelsReturned[i]
+                        if i!=(len(labelsReturned)-1):
+                            nameServer += "."
+                    
+                    print("CNAME Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))           
+        break
+
+    except clientSocket.timeout as e:
+        print("Socket Timeout: {}".format(e))
+        retries += 1
 
 
 
