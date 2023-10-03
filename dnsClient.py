@@ -19,7 +19,6 @@ print(args)
 #construct request packet header
 #id field
 randomNum = random.randint(0, 65535)
-print(randomNum)
 packet = struct.pack('>H', randomNum)
 #flags
 packet += struct.pack('>H', 256)
@@ -83,6 +82,28 @@ while retries < args.maxretries:
 
         #unpack DNS response header
         id, flags, qdcount, ancount, nscount, arcount = struct.unpack_from("!H H H H H H", received_data)
+
+        error = flags & 15
+        if error == 1:
+            print("Format Error: Server unable to interpret query")
+            break
+        elif error == 2:
+            print("Server failure. Unable to process query due to name server problem.")
+            break
+        elif error == 3:
+            print("NOTFOUND")
+            break
+        elif error == 4:
+            print("Not implemented: the name server does not support the requested kind of query")
+            break
+        elif error == 5:
+            print("Refused: the name server refuses to perform the requested operation for policy reasons")
+            break
+
+        if (ancount + nscount + arcount) <= 0:
+            print("NOTFOUND")
+            break
+        
         auth = ""
         if flags & 1024 == 1024:
             auth = "auth"
@@ -382,7 +403,7 @@ while retries < args.maxretries:
                             nameServer += "."
                     
                     print("CNAME Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))
-                    
+
         if(nscount>0):
             for i in range(arcount):
                 labelsReturned = []
@@ -790,9 +811,19 @@ while retries < args.maxretries:
                     print("CNAME Alias\t{}\t\tTTL\t{}\t\tAA\t{}".format(nameServer, aTtl, auth))           
         break
 
-    except clientSocket.timeout as e:
+    except socket.timeout as e:
         print("Socket Timeout: {}".format(e))
         retries += 1
+    except socket.herror as e:
+        print("There is an error related to the provided address.")
+    except socket.gaierror as e:
+        print("The provided host name is invalid.")
+    except socket.error as e:
+        print("There was an error creating the socket: {}".format(e))
+        retries += 1
+    
+if retries == 3:
+    print("Maximum number of retries exceeded.")
 
 
 
