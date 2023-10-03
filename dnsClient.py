@@ -15,7 +15,6 @@ parser.add_argument('server', type=str)
 parser.add_argument('name', type=str)
 
 args = parser.parse_args()
-print(args)
 #construct request packet header
 #id field
 randomNum = random.randint(0, 65535)
@@ -80,7 +79,6 @@ while retries < args.maxretries:
         clientSocket.close()
         elapsedTime = endTime - startTime
 
-        print(received_data)
         #unpack DNS response header
         id, flags, qdcount, ancount, nscount, arcount = struct.unpack_from("!H H H H H H", received_data)
 
